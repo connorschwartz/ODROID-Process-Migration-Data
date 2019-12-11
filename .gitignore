@@ -1,0 +1,10 @@
+test.sh
+.*.un~
+__pycache__
+.*.swp
+powmon-data/.old-data
+*.log
+*.pyc
+plots/
+monitor
+errlog
