@@ -18,8 +18,8 @@ TIMESTAMP_DIR="$CURR_DIR/process-monitoring/data"
 SUFFIX="all"
 
 AVAIL_GOVS="/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
-BIG_CPU_GOV="/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-LIL_CPU_GOV="/sys/devices/system/cpu/cpu7/cpufreq/scaling_governor"
+BIG_CPU_GOV="/sys/devices/system/cpu/cpu7/cpufreq/scaling_governor"
+LIL_CPU_GOV="/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
 OLD_BIG_CPU_GOV=""
 OLD_LIL_CPU_GOV=""
 
@@ -185,18 +185,31 @@ set_governor() {
 	NEW_BIG_CPU_GOV="performance"
 	NEW_LIL_CPU_GOV="performance"
 
-	if [[ "$1" == "ip" ]]; then
-		NEW_BIG_CPU_GOV="interactive"
-		NEW_LIL_CPU_GOV="performance"
-	elif [[ "$1" == "pi" ]]; then
-		NEW_BIG_CPU_GOV="performance"
+	if [[ "${1:0:1}" == "i" ]]; then
 		NEW_LIL_CPU_GOV="interactive"
-	elif [[ "$1" == "ii" ]]; then
-		NEW_BIG_CPU_GOV="interactive"
-		NEW_LIL_CPU_GOV="interactive"
-	elif [[ "$1" == "pp" ]]; then
-		NEW_BIG_CPU_GOV="performance"
+	elif [[ "${1:0:1}" == "p" ]]; then
 		NEW_LIL_CPU_GOV="performance"
+	elif [[ "${1:0:1}" == "c" ]]; then
+		NEW_LIL_CPU_GOV="conservative"
+	elif [[ "${1:0:1}" == "s" ]]; then
+		NEW_LIL_CPU_GOV="powersave"
+	elif [[ "${1:0:1}" == "o" ]]; then
+		NEW_LIL_CPU_GOV="ondemand"
+	else
+		echo "error: invalid governor string"
+		exit 1
+	fi
+	
+	if [[ "${1:1:1}" == "i" ]]; then
+		NEW_BIG_CPU_GOV="interactive"
+	elif [[ "${1:1:1}" == "p" ]]; then
+		NEW_BIG_CPU_GOV="performance"
+	elif [[ "${1:1:1}" == "c" ]]; then
+		NEW_BIG_CPU_GOV="conservative"
+	elif [[ "${1:1:1}" == "s" ]]; then
+		NEW_BIG_CPU_GOV="powersave"
+	elif [[ "${1:1:1}" == "o" ]]; then
+		NEW_BIG_CPU_GOV="ondemand"
 	else
 		echo "error: invalid governor string"
 		exit 1
@@ -214,7 +227,10 @@ set_governor() {
 
 	echo $NEW_BIG_CPU_GOV > "$BIG_CPU_GOV"
 	echo $NEW_LIL_CPU_GOV > "$LIL_CPU_GOV"
-
+	
+	echo "Big: $NEW_BIG_CPU_GOV"
+	echo "Little: $NEW_LIL_CPU_GOV"
+	
 	# governor did not change...
 	if ! [[ `cat $BIG_CPU_GOV | grep $NEW_BIG_CPU_GOV` ]] || ! [[ `cat $LIL_CPU_GOV | grep $NEW_LIL_CPU_GOV` ]]; then
 		echo "error: unable to change governor"
@@ -384,8 +400,19 @@ if [[ $MODE == "configs" ]]; then
 	# assign the power monitor to core 0, which never turns off
 	taskset -c 0 "$STHHAMP_DIR/datalogging_code/cdatalog" "$CURR_DIR/cdatalog-output" $PROFILE_SAMPLE_PERIOD_US 1 0x08 0x19 0x16 0x17 0x08 0x19 0x1D 0x16 0x17 0x61 &
 
-	# Start Chromium in the background and get a list of its processes
-	sudo -u odroid $COMMAND_TO_RUN $SITE $ITERATIONS &
+	# Start Chromium in the background
+	# Don't specify cores for the default option
+	if [[ $CORE_CONFIG == "Default" ]]; then
+		sudo -u odroid $COMMAND_TO_RUN $SITE $ITERATIONS &
+	# Specify big cores for AllBig
+	elif [[ $CORE_CONFIG == "AllBig" ]]; then
+		sudo -u odroid taskset -c 4-7 $COMMAND_TO_RUN $SITE $ITERATIONS &
+	# Otherwise start with small cores. We will move some of the processes to big cores later
+	else
+		sudo -u odroid taskset -c 0-3 $COMMAND_TO_RUN $SITE $ITERATIONS &
+	fi
+	
+	# Get a list of processes
 	val=$(ps ax | grep chromium | awk '{printf $1":"}')
 	IFS=':' read -r -a processes <<< "$val"
 	# Should be 8 processes in total (plus one more for the ps ax | grep chromium command)
@@ -396,36 +423,27 @@ if [[ $MODE == "configs" ]]; then
 	done
 	echo $val
 	
-	# For any config other than default, we will need to move processes among the different cores
-	if [[ $CORE_CONFIG != "Default" ]]; then
-		# Start by putting all on the small cores
-		for i in {0..7}
-		do
-			#echo $i
-			#stats=$(cat /proc/${processes[i]}/stat)
-			#echo $stats | cut -d' ' -f14
-			taskset -cp 0-3 "${processes[i]}"
-		done
-		# For 1Big, put the sixth process on a big core
-		if [[ $CORE_CONFIG == "1Big" ]]; then
-			taskset -cp 4 "${processes[5]}"
-		# For 2Big, put the sixth and first processes on big cores
-		elif [[ $CORE_CONFIG == "2Big" ]]; then
-			taskset -cp 4 "${processes[5]}"
-			taskset -cp 5 "${processes[0]}"
-		# For 3Big, put the sixth, first, and fourth processes on big cores
-		elif [[ $CORE_CONFIG == "3Big" ]]; then
-			taskset -cp 4 "${processes[5]}"
-			taskset -cp 5 "${processes[0]}"
-			taskset -cp 6 "${processes[3]}"
-		# For 4Big, put the sixth, first, fourth, and fifth processes on big cores
-		elif [[ $CORE_CONFIG == "4Big" ]]; then
-			taskset -cp 4 "${processes[5]}"
-			taskset -cp 5 "${processes[0]}"
-			taskset -cp 6 "${processes[3]}"
-			taskset -cp 7 "${processes[4]}"
-		fi
+	# For some configs, we have to move processes to different cores
+	# For 1Big, put the sixth process on a big core
+	if [[ $CORE_CONFIG == "1Big" ]]; then
+		taskset -cp 4 "${processes[5]}"
+	# For 2Big, put the sixth and first processes on big cores
+	elif [[ $CORE_CONFIG == "2Big" ]]; then
+		taskset -cp 4 "${processes[5]}"
+		taskset -cp 5 "${processes[0]}"
+	# For 3Big, put the sixth, first, and fourth processes on big cores
+	elif [[ $CORE_CONFIG == "3Big" ]]; then
+		taskset -cp 4 "${processes[5]}"
+		taskset -cp 5 "${processes[0]}"
+		taskset -cp 6 "${processes[3]}"
+	# For 4Big, put the sixth, first, fourth, and fifth processes on big cores
+	elif [[ $CORE_CONFIG == "4Big" ]]; then
+		taskset -cp 4 "${processes[5]}"
+		taskset -cp 5 "${processes[0]}"
+		taskset -cp 6 "${processes[3]}"
+		taskset -cp 7 "${processes[4]}"
 	fi
+	
 	# For the dynamic configuration, we will continuously monitor the first process for activity
 	if [[ $CORE_CONFIG == "Dynamic" ]]; then
 		declare -i finished=0

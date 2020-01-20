@@ -1,5 +1,7 @@
 # ODROID-Process-Migration-Data
-  
+
+If any of the scripts aren't working, you may need to use the dos2unix command (since I edit everything on Windows)
+
 COLLECTING PROCESS DATA AND DETERMINING KEY PROCESSES:  
   
   

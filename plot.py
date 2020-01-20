@@ -100,7 +100,7 @@ def scatterPlot(sites,govConfigs,loadTypes,loadTypeMap,coreConfigs,websiteData,o
 
 def overallScatterPlot(sites,govConfigs,loadTypes,loadTypeMap,coreConfigs,websiteData,outputPrefix,filePrefix,iterations):
     symbols=['x','o','*','+','>','<','s','v','X','D','p','H']
-    colors = ['r','g','b','orange','purple','black','yellow']
+    colors = ['r','g','b','orange','purple','black','yellow','gray']
     for siteIndex,site in enumerate(sites):
         fig, axs = plt.subplots(1,1, figsize=(8,8))
         for govIndex,gov in enumerate(govConfigs):
@@ -124,9 +124,9 @@ def overallScatterPlot(sites,govConfigs,loadTypes,loadTypeMap,coreConfigs,websit
         handles,labels = axs.get_legend_handles_labels() # only apply a legend to the bottom one
         circles = [plt.Circle((0, 0), 0.2, color=col) for col in colors]
         circleLabels = govConfigs
-        display = (0,1,2,3,4,5,6) # only display the first few handles
-        fig.legend([handle for i,handle in enumerate(handles) if i in display]+circles,
-                      [label for i,label in enumerate(labels) if i in display]+circleLabels)
+        display = (0,1,2,3,4,5,6,7) # only display the first few handles
+        fig.legend([handle for i,handle in enumerate(handles)]+circles,
+                      [label for i,label in enumerate(labels)]+circleLabels)
 
         #fig.tight_layout()
         plt.savefig(outputPrefix+filePrefix+site+"-overall.pdf")
@@ -158,7 +158,7 @@ def main():
     #        if (little+"-"+big in badConfigs):
     #            continue
     #        coreConfigs.append(little+"-"+big)
-    coreConfigs=["AllSmall","Dynamic","1Big","2Big","3Big","4Big","Default"]
+    coreConfigs=["AllSmall","Dynamic","1Big","2Big","3Big","4Big","Default","AllBig"]
     govConfigs = ["ii"]
 
     #loadTypes = ['navigationStart', 'fetchStart', 'domainLookupStart',

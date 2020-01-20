@@ -5,8 +5,8 @@ ITERATIONS=$2
 MODE=$3
 
 declare -a configs governors iterconfig itergovernor # declare arrays
-configs=("Default" "AllSmall" "Dynamic" "1Big" "2Big" "3Big" "4Big") # all core configs to test with
-governors=("pi" "ii" "ip" "pp") # all core configs to test with
+configs=("AllSmall" "Default" "Dynamic" "1Big" "2Big" "3Big" "4Big" "AllBig") # all core configs to test with
+governors=("ii") # all core configs to test with
 
 array_contains () {
 	local array="$1[@]"
@@ -22,13 +22,14 @@ array_contains () {
 }
 
 gen_iterconfig() { # generate a permutation of the configs
+	CONFIG_COUNT=${#configs[@]}
 	iterconfig=()
-	for (( i=1; i <= 7; i++ ))
+	for (( i=1; i <= $CONFIG_COUNT; i++ ))
 	do
-		x=$( echo "$RANDOM % 7" | bc )
+		x=$( echo "$RANDOM % $CONFIG_COUNT" | bc )
 		array_contains iterconfig ${configs["$x"]}
 		while [ $? -eq 0 ]; do
-			x=$( echo "$RANDOM % 7" | bc )
+			x=$( echo "$RANDOM % $CONFIG_COUNT" | bc )
 			array_contains iterconfig ${configs["$x"]}
 		done
 		iterconfig=("${iterconfig[@]}" ${configs["$x"]})
@@ -36,13 +37,14 @@ gen_iterconfig() { # generate a permutation of the configs
 }
 
 gen_itergovernor() { # generate a permutation of the governors
+	GOV_COUNT=${#governors[@]}
 	itergovernor=()
-	for (( i=1; i <= 4; i++ ))
+	for (( i=1; i <= $GOV_COUNT; i++ ))
 	do
-		x=$( echo "$RANDOM % 4" | bc )
+		x=$( echo "$RANDOM % $GOV_COUNT" | bc )
 		array_contains itergovernor ${governors["$x"]}
 		while [ $? -eq 0 ]; do
-			x=$( echo "$RANDOM % 4" | bc )
+			x=$( echo "$RANDOM % $GOV_COUNT" | bc )
 			array_contains itergovernor ${governors["$x"]}
 		done
 		itergovernor=("${itergovernor[@]}" ${governors["$x"]})
@@ -63,13 +65,13 @@ elif [ $# -lt 3 ]; then
 fi
 
 
-#gen_itergovernor
+gen_itergovernor
 
 # for each governor, could be for each config first,
 # but the idea behind looping through various configs 
 # in the inner loop is to possiblity that caching will help a config
 # since it will not be run consecutively 
-for gov in "ii"; do #${itergovernor[@]}; do  # for each governor, configs could be looped through first,
+for gov in ${itergovernor[@]}; do  # for each governor, configs could be looped through first,
 	if [ $MODE == "configs" ]; then
 		gen_iterconfig
 		for config in ${iterconfig[@]}; do
