@@ -72,7 +72,7 @@ def stackedBar(sites,govConfigs,loadTypes,coreConfigs,websiteData,outputPrefix):
 def scatterPlot(sites,govConfigs,loadTypes,loadTypeMap,coreConfigs,websiteData,outputPrefix,filePrefix):
     symbols=['x','o','*','+','>','<','s','v','X','D','p','H']
     for siteIndex,site in enumerate(sites):
-        for gov in govConfigs:
+        for govIndex,gov in govConfigs:
             addLegend = True
             fig, axs = plt.subplots(4,1, figsize=(8,8))
             for eventIndex,loadType in enumerate(loadTypes[0:len(loadTypes)-1]):
@@ -124,7 +124,6 @@ def overallScatterPlot(sites,govConfigs,loadTypes,loadTypeMap,coreConfigs,websit
         handles,labels = axs.get_legend_handles_labels() # only apply a legend to the bottom one
         circles = [plt.Circle((0, 0), 0.2, color=col) for col in colors]
         circleLabels = govConfigs
-        display = (0,1,2,3,4,5,6,7) # only display the first few handles
         fig.legend([handle for i,handle in enumerate(handles)]+circles,
                       [label for i,label in enumerate(labels)]+circleLabels)
 
