@@ -44,6 +44,7 @@ GOV_STR=$3
 SITE=$4
 MODE=$5
 ITERATIONS=$6
+CPUFREQUENCY=$7
 
 
 give_usage() {
@@ -195,6 +196,8 @@ set_governor() {
 		NEW_LIL_CPU_GOV="powersave"
 	elif [[ "${1:0:1}" == "o" ]]; then
 		NEW_LIL_CPU_GOV="ondemand"
+	elif [[ "${1:0:1}" == "u" ]]; then
+		NEW_LIL_CPU_GOV="userspace"
 	else
 		echo "error: invalid governor string"
 		exit 1
@@ -210,6 +213,8 @@ set_governor() {
 		NEW_BIG_CPU_GOV="powersave"
 	elif [[ "${1:1:1}" == "o" ]]; then
 		NEW_BIG_CPU_GOV="ondemand"
+	elif [[ "${1:1:1}" == "u" ]]; then
+		NEW_BIG_CPU_GOV="userspace"
 	else
 		echo "error: invalid governor string"
 		exit 1
@@ -338,7 +343,7 @@ fi
 #core_config_flag=$(get_config $CORE_CONFIG)
 core_config_flag=$CORE_CONFIG
 ID=`mktemp -u XXXXXXXX`
-SUFFIX="$CORE_CONFIG-$GOV_STR-$ID"
+SUFFIX="$CORE_CONFIG-$GOV_STR$CPUFREQUENCY-$ID"
 
 
 echo ""
@@ -442,6 +447,73 @@ if [[ $MODE == "configs" ]]; then
 		taskset -cp 5 "${processes[0]}"
 		taskset -cp 6 "${processes[3]}"
 		taskset -cp 7 "${processes[4]}"
+	fi
+	
+	# Alter the frequency for the big cores if desired
+	if [[ $CPUFREQUENCY == "MAX" ]]; then
+		cpufreq-set -c 4 -f 2000MHz
+		echo "MAX"
+	elif [[ $CPUFREQUENCY == "HIGH" ]]; then
+		cpufreq-set -c 4 -f 1500MHz
+		echo "HIGH"
+	elif [[ $CPUFREQUENCY == "MEDIUM" ]]; then
+		cpufreq-set -c 4 -f 1000MHz
+		echo "MEDIUM"
+	elif [[ $CPUFREQUENCY == "LOW" ]]; then
+		cpufreq-set -c 4 -f 500MHz
+		echo "LOW"
+	elif [[ $CPUFREQUENCY == "MIN" ]]; then
+		cpufreq-set -c 4 -f 200MHz
+		echo "MIN"
+	# Dynamic moves between HIGH and LOW frequency, depending on activity levels
+	elif [[ $CPUFREQUENCY == "DYNAMIC" ]]; then
+		echo "DYNAMIC"
+		declare -i finished=0
+		declare -i big=0
+		
+		prev_time=$(date '+%s%N' | cut -b1-13)
+		stats=$(cat /proc/${processes[5]}/stat)
+		prev_ticks="$(echo $stats | cut -d' ' -f14)"
+		sleep 0.04
+		while [ $finished -eq 0 ]
+		do
+			# Get the current system time, and the sixth process' user time so far from the proc folder
+			current_time=$(date '+%s%N' | cut -b1-13)
+			stats=$(cat /proc/${processes[5]}/stat)
+			pid="$(echo $stats | cut -d' ' -f1)"
+			usertime="$(echo $stats | cut -d' ' -f14)"
+			ratio=100
+			# If the number of ticks isn't 0, compute time elapsed / ticks used by the process
+			if [ $usertime -gt $prev_ticks ]
+			then
+				ratio="$(( ($current_time - $prev_time) / ($usertime - $prev_ticks) ))"
+			fi
+			echo $ratio
+			# If the ratio of time elapsed/ticks used by the process is low, activity is high and we should use a high frequency
+			if [ $ratio -lt 10 ]
+			then
+				if [ $big -eq 0 ]
+				then
+					cpufreq-set -c 4 -f 1500MHz
+					big=1
+				fi
+			# Otherwise it should have low frequency
+			else
+				if [ $big -eq 1 ]
+				then
+					cpufreq-set -c 4 -f 500MHz
+					big=0
+				fi
+			fi
+			# If the process' proc file was empty, it is finished, so we will exit the loop
+			if [ "$pid" == '' ]
+			then
+				finished=1
+			fi
+			prev_time=$current_time
+			prev_ticks=$usertime
+			sleep 0.04
+		done
 	fi
 	
 	# For the dynamic configuration, we will continuously monitor the first process for activity
