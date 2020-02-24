@@ -34,7 +34,7 @@ This will go through all of the files in the json-data and powmon-data with the 
 This will create the following files:  
 - Scatterplots in the plots directory of power usage vs load time for each site. It gives both a version split up by loading phase and an overall one  
 - plots/prefix-core-migration-data.csv - load time and energy data, formatted for analysis in Excel. The improvement-percentages.xlsx files in plots/11-27-19-400trials use this file  
-- counters/prefix-counter-data.csv - counter data (i.e. cache refills), formatted for analysis in Excel. The counter-graphs.xlsx file in plots/11-27-19-400trials uses this file  
+- counters/prefix-counter-data.csv - counter data (e.g. cache refills), formatted for analysis in Excel.
   
 Examples of these files based on a run of 400 trials can be found in plots/11-27-19-400trials  
   
